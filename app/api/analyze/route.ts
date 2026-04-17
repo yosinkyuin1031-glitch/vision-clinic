@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { analyzeVisionAssessment } from '@/lib/ai-analysis'
 import { createServerClient } from '@/lib/supabase'
-import { getCurrentClinicId } from '@/lib/supabase-server'
+import { getCurrentUser, getCurrentClinicId } from '@/lib/supabase-server'
 import type { EyeTrackingData, VisionChecklist30 } from '@/types'
 
 export const maxDuration = 60
@@ -19,14 +19,24 @@ interface RequestBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+
     const { patient_id, clinic_id, eye_data, checklist, patient_age, patient_gender, occupation, age_group } =
       (await req.json()) as RequestBody
-    if (!patient_id || !eye_data) {
-      return NextResponse.json({ error: '必須パラメータ不足' }, { status: 400 })
+    if (!patient_id || typeof patient_id !== 'string') {
+      return NextResponse.json({ error: '患者IDが不正です' }, { status: 400 })
+    }
+    if (!eye_data || typeof eye_data !== 'object') {
+      return NextResponse.json({ error: '検査データが不正です' }, { status: 400 })
     }
 
     const sessionClinicId = await getCurrentClinicId()
     const effectiveClinicId = sessionClinicId ?? clinic_id ?? null
+
+    if (!effectiveClinicId) {
+      return NextResponse.json({ error: '院情報が見つかりません' }, { status: 403 })
+    }
 
     const aiAnalysis = await analyzeVisionAssessment(
       eye_data,

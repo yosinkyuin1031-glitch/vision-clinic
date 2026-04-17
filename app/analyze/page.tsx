@@ -329,57 +329,81 @@ function AnalyzeContent() {
     }
   }, [cameraPhase, liveFrame, pursuitTarget])
 
+  // サッカードのターゲット位置（左右中心に8箇所）
+  const saccadePositions = useRef([
+    { x: 15, y: 50 }, { x: 85, y: 50 },  // 左→右
+    { x: 20, y: 30 }, { x: 80, y: 70 },  // 左上→右下
+    { x: 85, y: 35 }, { x: 15, y: 65 },  // 右上→左下
+    { x: 20, y: 50 }, { x: 80, y: 50 },  // 左→右
+  ]).current
+
   // サッカードテスト
+  const showNextSaccadeTargetRef = useRef<() => void>(() => {})
+
   const startSaccadeTest = useCallback(() => {
     setCameraPhase('saccade')
     saccadeTrialsRef.current = []
+    saccadeIrisStartRef.current = null
     setSaccadeCount(0)
-    showNextSaccadeTarget()
-  }, [])
+    // 最初のターゲットを表示
+    setSaccadeTarget(saccadePositions[0])
+    saccadeStartRef.current = performance.now()
+    setSaccadeCount(1)
+  }, [saccadePositions])
 
-  const showNextSaccadeTarget = useCallback(() => {
-    const positions = [
-      { x: 20, y: 50 }, { x: 80, y: 50 },
-      { x: 50, y: 20 }, { x: 50, y: 80 },
-      { x: 25, y: 30 }, { x: 75, y: 70 },
-      { x: 30, y: 70 }, { x: 70, y: 30 },
-    ]
+  // showNextSaccadeTargetをrefで管理（依存関係の問題を回避）
+  showNextSaccadeTargetRef.current = () => {
     const idx = saccadeTrialsRef.current.length
     if (idx >= 8) {
       finishCameraTest()
       return
     }
-    setSaccadeTarget(positions[idx])
+    setSaccadeTarget(saccadePositions[idx])
     saccadeStartRef.current = performance.now()
     setSaccadeCount(idx + 1)
-  }, [])
+  }
 
-  // サッカード応答（ターゲットを見た判定→1.2秒後に次）
+  // サッカード用: ターゲット出現時の虹彩位置を記録
+  const saccadeIrisStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  // サッカード応答（虹彩の移動量で判定）
   useEffect(() => {
     if (cameraPhase !== 'saccade' || !saccadeTarget || !liveFrame) return
 
     const elapsed = performance.now() - saccadeStartRef.current
     if (elapsed < 200) return // 最低200ms待つ
 
-    // 虹彩中央とターゲットの距離をチェック
-    const videoW = videoRef.current?.videoWidth || 1280
-    const videoH = videoRef.current?.videoHeight || 720
-    const targetPxX = (saccadeTarget.x / 100) * videoW
-    const targetPxY = (saccadeTarget.y / 100) * videoH
+    // 眼窩内の相対虹彩位置（頭部移動の影響を除去）
+    const eyeCX = (liveFrame.rightEyeOuter.x + liveFrame.leftEyeOuter.x) / 2
+    const eyeCY = (liveFrame.rightEyeOuter.y + liveFrame.leftEyeOuter.y) / 2
     const irisMidX = (liveFrame.rightIris.x + liveFrame.leftIris.x) / 2
     const irisMidY = (liveFrame.rightIris.y + liveFrame.leftIris.y) / 2
-    const dist = Math.hypot(irisMidX - targetPxX, irisMidY - targetPxY)
-    const refWidth = liveFrame.eyeWidthPx || 200
-    const relDist = dist / refWidth
+    const relIrisX = irisMidX - eyeCX
+    const relIrisY = irisMidY - eyeCY
 
-    // 1.5秒経過で自動次へ
-    if (elapsed > 1500 || relDist < 0.15) {
+    // 初回フレーム: 開始位置を記録
+    if (!saccadeIrisStartRef.current) {
+      saccadeIrisStartRef.current = { x: relIrisX, y: relIrisY }
+    }
+
+    // 虹彩の移動量（開始位置からの変化）
+    const irisDist = Math.hypot(
+      relIrisX - saccadeIrisStartRef.current.x,
+      relIrisY - saccadeIrisStartRef.current.y,
+    )
+    const eyeWidth = liveFrame.eyeWidthPx || 200
+    const relMove = irisDist / eyeWidth
+
+    // 虹彩が眼幅の2%以上動いた or 1.5秒経過で次へ
+    const reached = relMove > 0.02
+    if (elapsed > 1500 || (elapsed > 300 && reached)) {
       saccadeTrialsRef.current.push({
         reactionMs: elapsed,
-        overshootPx: dist,
-        targetReached: relDist < 0.2,
+        overshootPx: irisDist,
+        targetReached: reached,
       })
-      setTimeout(() => showNextSaccadeTarget(), 300)
+      saccadeIrisStartRef.current = null // 次のターゲット用にリセット
+      setTimeout(() => showNextSaccadeTargetRef.current(), 300)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraPhase, liveFrame, saccadeTarget])
@@ -548,7 +572,7 @@ function AnalyzeContent() {
       {/* ======== STEP2: 30項目チェックリスト ======== */}
       {step === 'checklist' && (
         <div>
-          <h1 className="text-2xl font-black mb-2">セルフチェック（30項目）</h1>
+          <h1 id="checklist-top" className="text-2xl font-black mb-2">セルフチェック（30項目）</h1>
           <p className="text-gray-500 mb-4">
             <span className="font-bold text-gray-900">{patient?.name}</span> さんに当てはまるものを選択してください
           </p>
@@ -621,8 +645,16 @@ function AnalyzeContent() {
           <div className="flex gap-3">
             <button onClick={() => setStep('select_patient')} className="btn-secondary">← 戻る</button>
             {checklistCategory !== 'c' ? (
-              <button onClick={() => setChecklistCategory(checklistCategory === 'a' ? 'b' : 'c')} className="btn-primary flex-1">
-                次のカテゴリへ →
+              <button onClick={() => {
+                setChecklistCategory(checklistCategory === 'a' ? 'b' : 'c')
+                requestAnimationFrame(() => {
+                  const el = document.getElementById('checklist-top')
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'instant', block: 'start' })
+                  }
+                })
+              }} className="btn-primary flex-1">
+                {checklistCategory === 'a' ? 'B: 両眼協調へ →' : 'C: 姿勢連動へ →'}
               </button>
             ) : (
               <button onClick={() => setStep('camera_test')} className="btn-primary flex-1">カメラ評価へ →</button>
@@ -647,89 +679,133 @@ function AnalyzeContent() {
           {error && <div className="bg-red-50 border border-red-300 text-red-700 rounded-xl p-4 mb-4 text-sm font-medium">{error}</div>}
 
           {/* カメラプレビュー */}
-          <div className="relative bg-black rounded-2xl overflow-hidden mb-4 aspect-video">
+          <div className="relative bg-black rounded-2xl overflow-hidden mb-3 aspect-[3/4]">
             <video ref={videoRef} muted playsInline className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
             {!cameraReady && !cameraError && (
               <div className="absolute inset-0 flex items-center justify-center text-white">
                 <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
               </div>
             )}
-            {liveFrame && cameraReady && (
-              <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs rounded px-2 py-1">
-                顔検出 OK
+            {liveFrame && cameraReady && cameraPhase === 'ready' && (
+              <div className="absolute bottom-2 left-2 bg-black/70 text-green-400 text-xs rounded px-2 py-1 font-bold">
+                顔検出OK
               </div>
             )}
 
-            {/* 注視テスト: 中央の固定ターゲット */}
+            {/* 注視テスト: 中央の赤い点のみ（テキストなし） */}
             {cameraPhase === 'fixation' && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-6 h-6 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/80 text-white text-sm font-bold rounded-lg px-4 py-2">
-                  中央の赤い点を見つめてください... {phaseTimer}秒
-                </div>
+                <div className="w-8 h-8 bg-red-500 rounded-full shadow-lg shadow-red-500/50 border-2 border-white" />
               </div>
             )}
 
-            {/* 追従テスト: 動くターゲット */}
+            {/* 輻輳テスト: 画面上の点（遠く=小さい / 近く=大きい） */}
+            {cameraPhase === 'convergence_base' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-4 h-4 bg-indigo-500 rounded-full border-2 border-white" />
+              </div>
+            )}
+            {cameraPhase === 'convergence_near' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-12 h-12 bg-indigo-500 rounded-full border-2 border-white animate-pulse" />
+              </div>
+            )}
+
+            {/* 追従テスト: 緑の点のみ（テキストなし） */}
             {cameraPhase === 'pursuit' && (
               <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute w-5 h-5 bg-green-500 rounded-full shadow-lg shadow-green-500/50 transition-all duration-100"
+                <div className="absolute w-7 h-7 bg-green-500 rounded-full shadow-lg shadow-green-500/50 border-2 border-white transition-all duration-75"
                   style={{ left: `${pursuitTarget.x}%`, top: `${pursuitTarget.y}%`, transform: 'translate(-50%,-50%)' }} />
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/80 text-white text-sm font-bold rounded-lg px-4 py-2">
-                  緑の点を目で追ってください... {phaseTimer}秒
-                </div>
               </div>
             )}
 
-            {/* サッカードテスト: ジャンプターゲット */}
+            {/* サッカードテスト: 黄色い点のみ（テキストなし） */}
             {cameraPhase === 'saccade' && saccadeTarget && (
               <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute w-6 h-6 bg-yellow-400 rounded-full shadow-lg shadow-yellow-400/50"
+                <div className="absolute w-8 h-8 bg-yellow-400 rounded-full shadow-lg shadow-yellow-400/50 border-2 border-white"
                   style={{ left: `${saccadeTarget.x}%`, top: `${saccadeTarget.y}%`, transform: 'translate(-50%,-50%)' }} />
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/80 text-white text-sm font-bold rounded-lg px-4 py-2">
-                  黄色い点をすばやく見て！ ({saccadeCount}/8)
-                </div>
               </div>
             )}
           </div>
 
+          {/* ===== 指示テキスト（カメラ映像の外・下に表示） ===== */}
+          {cameraPhase === 'fixation' && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3 text-center">
+              <p className="text-xs text-red-500 font-bold">STEP 1/4 注視テスト</p>
+              <p className="text-sm font-bold text-red-800 mt-0.5">画面中央の赤い点を見つめてください</p>
+              <p className="text-3xl font-black text-red-600 mt-1">{phaseTimer}<span className="text-sm font-normal">秒</span></p>
+            </div>
+          )}
+
+          {cameraPhase === 'pursuit' && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3 text-center">
+              <p className="text-xs text-green-500 font-bold">STEP 3/4 追従テスト</p>
+              <p className="text-sm font-bold text-green-800 mt-0.5">緑の点を目だけで追ってください</p>
+              <p className="text-3xl font-black text-green-600 mt-1">{phaseTimer}<span className="text-sm font-normal">秒</span></p>
+            </div>
+          )}
+
+          {cameraPhase === 'saccade' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-3 text-center">
+              <p className="text-xs text-yellow-600 font-bold">STEP 4/4 サッカードテスト</p>
+              <p className="text-sm font-bold text-yellow-800 mt-0.5">黄色い点が出たら素早くそちらを見てください</p>
+              <div className="flex items-center justify-center gap-1.5 mt-2">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <div key={i} className={`w-3 h-3 rounded-full ${i < saccadeCount ? 'bg-yellow-500' : 'bg-yellow-200'}`} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* フェーズ別コントロール */}
           {cameraPhase === 'ready' && cameraReady && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
-              <p className="font-bold text-indigo-800 mb-2">測定手順（約40秒）</p>
-              <ol className="space-y-1 list-decimal ml-5 text-sm text-indigo-700">
-                <li>注視テスト（10秒）: 中央の点を見つめる</li>
-                <li>輻輳テスト: 遠く→近くの寄り目</li>
-                <li>追従テスト（8秒）: 動く点を目で追う</li>
-                <li>サッカードテスト（8回）: 出現する点を素早く見る</li>
-              </ol>
-              <p className="text-xs text-indigo-600 mt-2">※ 瞬目・頭部代償はテスト全体を通じて自動測定されます</p>
-              <button onClick={startFixationTest} className="btn-primary w-full mt-4">測定開始</button>
+              <p className="font-bold text-indigo-800 mb-3">これから4つのテストを行います</p>
+              <div className="space-y-2.5 mb-3">
+                {[
+                  { step: 1, title: '注視', desc: '中央の赤い点をじっと見つめる', time: '10秒', color: 'bg-red-500' },
+                  { step: 2, title: '輻輳', desc: '画面の点を見て寄り目の測定', time: '自動', color: 'bg-indigo-500' },
+                  { step: 3, title: '追従', desc: '動く緑の点を目で追いかける', time: '8秒', color: 'bg-green-500' },
+                  { step: 4, title: 'サッカード', desc: '黄色い点が出たらそちらを見る', time: '8回', color: 'bg-yellow-500' },
+                ].map(item => (
+                  <div key={item.step} className="flex items-center gap-3">
+                    <div className={`w-7 h-7 ${item.color} rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0`}>{item.step}</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-indigo-800">{item.title}<span className="text-xs font-normal text-indigo-600 ml-1">({item.time})</span></p>
+                      <p className="text-xs text-indigo-600">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-indigo-500 mb-3">スマホを顔の正面に置き、頭は動かさず目だけで追ってください。</p>
+              <button onClick={startFixationTest} className="btn-primary w-full">測定を開始する</button>
             </div>
           )}
 
           {cameraPhase === 'convergence_base' && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
-              <p className="font-bold text-indigo-800 mb-2">輻輳テスト ①</p>
+              <p className="text-xs font-bold text-indigo-600 mb-1">STEP 2/4 輻輳テスト ①</p>
+              <p className="font-bold text-indigo-800 mb-2">画面中央の小さい点を両目で見てください</p>
               <p className="text-sm text-indigo-700 mb-3">
-                ペン先を<strong>腕を伸ばした位置</strong>に持ち、両目で見てください。準備ができたら撮影ボタンを押してください。
+                スマホを<strong>腕を伸ばした距離</strong>で持ち、点を見つめてください。
               </p>
               <button onClick={captureBase} disabled={!liveFrame}
                 className="btn-primary w-full disabled:opacity-40">
-                {baseFrame ? '✓ 基準フレーム撮影済み — もう一度撮影' : '基準フレームを撮影'}
+                この距離で撮影
               </button>
             </div>
           )}
 
           {cameraPhase === 'convergence_near' && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
-              <p className="font-bold text-indigo-800 mb-2">輻輳テスト ②</p>
+              <p className="text-xs font-bold text-indigo-600 mb-1">STEP 2/4 輻輳テスト ②</p>
+              <p className="font-bold text-indigo-800 mb-2">スマホを顔に近づけて点を見てください</p>
               <p className="text-sm text-indigo-700 mb-3">
-                ペン先を<strong>鼻先</strong>までゆっくり近づけ、両目で追い続けてください。限界地点で撮影してください。
+                画面の点を両目で見ながら、スマホを<strong>顔から15〜20cm</strong>の位置に近づけてください。
               </p>
               <button onClick={captureNear} disabled={!liveFrame}
                 className="btn-primary w-full disabled:opacity-40">
-                近点フレームを撮影 → 追従テストへ
+                この距離で撮影 → 次へ
               </button>
             </div>
           )}
@@ -1175,14 +1251,14 @@ function AnalyzeContent() {
 export default function AnalyzePage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm no-print">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="text-gray-500 hover:text-gray-900 text-sm font-medium">← ダッシュボード</Link>
-          <span className="font-bold text-gray-900">視機能評価</span>
-          <div />
+      <header className="mobile-header no-print">
+        <div className="mobile-header-inner">
+          <Link href="/" className="text-gray-500 hover:text-gray-900 text-sm font-medium min-h-[44px] flex items-center">← 戻る</Link>
+          <span className="font-bold text-gray-900 text-sm">視機能評価</span>
+          <div className="w-10" />
         </div>
       </header>
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-lg mx-auto px-4 py-6 pb-8">
         <Suspense fallback={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
           <AnalyzeContent />
         </Suspense>

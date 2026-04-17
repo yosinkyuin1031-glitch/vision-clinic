@@ -100,31 +100,32 @@ export default function PatientDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm no-print">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/patients" className="text-gray-500 hover:text-gray-900 text-sm font-medium">← 患者一覧</Link>
-          <span className="font-bold text-gray-900">{patient.name}</span>
-          <Link href={`/analyze?patient_id=${patient.id}`} className="btn-primary text-sm py-2 px-3">視機能評価</Link>
+      <header className="mobile-header no-print">
+        <div className="mobile-header-inner">
+          <Link href="/patients" className="text-gray-500 hover:text-gray-900 text-sm font-medium min-h-[44px] flex items-center">← 戻る</Link>
+          <span className="font-bold text-gray-900 text-sm truncate max-w-[40%]">{patient.name}</span>
+          <Link href={`/analyze?patient_id=${patient.id}`} className="text-indigo-600 font-bold text-sm min-h-[44px] flex items-center">評価</Link>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 no-print">
+      <main className="max-w-lg mx-auto px-4 py-4 no-print">
         {/* 患者情報 */}
-        <div className="card mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center text-3xl">
+        <div className="card mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
               {patient.gender === 'male' ? '👨' : '👩'}
             </div>
-            <div>
-              <h1 className="text-2xl font-black text-gray-900">{patient.name}</h1>
-              <p className="text-gray-500">
-                {patient.age ? `${patient.age}歳` : '年齢未登録'} /
-                {patient.gender === 'male' ? ' 男性' : patient.gender === 'female' ? ' 女性' : ' 未設定'}
-                {patient.occupation ? ` / ${patient.occupation}` : ''}
-                {patient.wears_glasses ? ' / 眼鏡使用' : ''}
-                {patient.phone && ` · ${patient.phone}`}
+            <div className="min-w-0">
+              <h1 className="text-lg font-black text-gray-900">{patient.name}</h1>
+              <p className="text-xs text-gray-500">
+                {patient.age ? `${patient.age}歳` : '年齢未登録'}
+                {patient.gender === 'male' ? ' · 男性' : patient.gender === 'female' ? ' · 女性' : ''}
+                {patient.occupation ? ` · ${patient.occupation}` : ''}
+                {patient.wears_glasses ? ' · 眼鏡' : ''}
               </p>
-              <p className="text-xs text-gray-400 mt-1">登録日: {new Date(patient.created_at).toLocaleDateString('ja-JP')}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {patient.phone && `${patient.phone} · `}登録 {new Date(patient.created_at).toLocaleDateString('ja-JP')}
+              </p>
             </div>
           </div>
         </div>

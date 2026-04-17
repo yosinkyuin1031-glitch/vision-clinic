@@ -254,22 +254,31 @@ export function evaluateFixationItem(frames: EyeFrame[], durationMs: number): Ca
   if (frames.length < 10) {
     return { score: 0, level: 'impaired', rawValue: 0, unit: '回', details: 'フレーム不足' }
   }
-  // 虹彩座標の安定性 → 逸脱回数をカウント
-  const threshold = 3 // ピクセル（微小な揺れは無視）
-  let deviations = 0
-  const avgX = frames.reduce((s, f) => s + (f.rightIris.x + f.leftIris.x) / 2, 0) / frames.length
-  const avgY = frames.reduce((s, f) => s + (f.rightIris.y + f.leftIris.y) / 2, 0) / frames.length
+  // 眼幅に対する相対的な閾値を使用（カメラノイズに対応）
+  const eyeWidth = frames[0].eyeWidthPx || 200
+  const threshold = eyeWidth * 0.02 // 眼幅の2%（3pxではなく相対値）
 
-  for (const f of frames) {
-    const midX = (f.rightIris.x + f.leftIris.x) / 2
-    const midY = (f.rightIris.y + f.leftIris.y) / 2
-    const dist = Math.hypot(midX - avgX, midY - avgY)
+  // 虹彩の眼窩内相対位置で計算（頭部移動の影響を除去）
+  const getRelativeIrisPos = (f: EyeFrame) => {
+    const eyeCenterX = (f.rightEyeOuter.x + f.leftEyeOuter.x) / 2
+    const eyeCenterY = (f.rightEyeOuter.y + f.leftEyeOuter.y) / 2
+    const irisMidX = (f.rightIris.x + f.leftIris.x) / 2
+    const irisMidY = (f.rightIris.y + f.leftIris.y) / 2
+    return { x: irisMidX - eyeCenterX, y: irisMidY - eyeCenterY }
+  }
+
+  const positions = frames.map(getRelativeIrisPos)
+  const avgX = positions.reduce((s, p) => s + p.x, 0) / positions.length
+  const avgY = positions.reduce((s, p) => s + p.y, 0) / positions.length
+
+  let deviations = 0
+  for (const p of positions) {
+    const dist = Math.hypot(p.x - avgX, p.y - avgY)
     if (dist > threshold) deviations++
   }
 
-  // 逸脱率でスコア算出
   const deviationRate = deviations / frames.length
-  const score = Math.min(100, Math.max(0, Math.round((1 - deviationRate) * 100)))
+  const score = Math.min(100, Math.max(0, Math.round((1 - deviationRate * 2) * 100)))
   const seconds = (durationMs / 1000).toFixed(1)
   return {
     score,
@@ -281,11 +290,11 @@ export function evaluateFixationItem(frames: EyeFrame[], durationMs: number): Ca
 }
 
 // ========================================
-// 4. 追従運動（ターゲット追従のズレ率）
+// 4. 追従運動（虹彩の滑らかさ＋方向一致度）
 // ========================================
 export interface PursuitFrame {
   eyeFrame: EyeFrame
-  targetX: number  // ターゲットのピクセル座標
+  targetX: number  // ターゲット方向（0-100%を変換したもの）
   targetY: number
 }
 
@@ -293,27 +302,64 @@ export function evaluatePursuitItem(frames: PursuitFrame[]): CameraEvalItem {
   if (frames.length < 10) {
     return { score: 0, level: 'impaired', rawValue: 0, unit: '%', details: 'フレーム不足' }
   }
-  // 虹彩中央とターゲット位置のズレを計算
-  let totalError = 0
-  for (const f of frames) {
-    const irisMidX = (f.eyeFrame.rightIris.x + f.eyeFrame.leftIris.x) / 2
-    const irisMidY = (f.eyeFrame.rightIris.y + f.eyeFrame.leftIris.y) / 2
-    const error = Math.hypot(irisMidX - f.targetX, irisMidY - f.targetY)
-    totalError += error
+
+  // 眼窩内の相対的な虹彩位置を使用（頭部移動の影響を除去）
+  const getRelIris = (f: PursuitFrame) => {
+    const ecx = (f.eyeFrame.rightEyeOuter.x + f.eyeFrame.leftEyeOuter.x) / 2
+    const ecy = (f.eyeFrame.rightEyeOuter.y + f.eyeFrame.leftEyeOuter.y) / 2
+    const ix = (f.eyeFrame.rightIris.x + f.eyeFrame.leftIris.x) / 2
+    const iy = (f.eyeFrame.rightIris.y + f.eyeFrame.leftIris.y) / 2
+    return { x: ix - ecx, y: iy - ecy }
   }
-  const avgError = totalError / frames.length
-  // 目幅の何%のズレか
-  const refWidth = frames[0].eyeFrame.eyeWidthPx || 200
-  const errorRate = avgError / refWidth
-  const accuracy = Math.max(0, 1 - errorRate * 5) * 100
+
+  // 方向一致度: 虹彩の移動方向がターゲットの移動方向と一致しているか
+  let directionMatches = 0
+  let directionTotal = 0
+
+  // 滑らかさ: 虹彩速度の安定性（ばらつきが小さい=滑らか）
+  const irisVelocities: number[] = []
+
+  for (let i = 1; i < frames.length; i++) {
+    const prevIris = getRelIris(frames[i - 1])
+    const currIris = getRelIris(frames[i])
+    const irisDx = currIris.x - prevIris.x
+    const irisDy = currIris.y - prevIris.y
+    const irisSpeed = Math.hypot(irisDx, irisDy)
+    irisVelocities.push(irisSpeed)
+
+    const targetDx = frames[i].targetX - frames[i - 1].targetX
+    const targetDy = frames[i].targetY - frames[i - 1].targetY
+    const targetSpeed = Math.hypot(targetDx, targetDy)
+
+    // ターゲットが動いているフレームのみ方向を比較
+    if (targetSpeed > 1 && irisSpeed > 0.1) {
+      // コサイン類似度
+      const dot = irisDx * targetDx + irisDy * targetDy
+      const cosine = dot / (irisSpeed * targetSpeed)
+      if (cosine > 0) directionMatches++ // 同じ方向に動いている
+      directionTotal++
+    }
+  }
+
+  // 方向スコア（0-100）
+  const directionScore = directionTotal > 0 ? (directionMatches / directionTotal) * 100 : 50
+
+  // 滑らかさスコア（速度の変動係数が小さい=滑らか）
+  const avgVel = irisVelocities.reduce((a, b) => a + b, 0) / irisVelocities.length
+  const velStd = Math.sqrt(irisVelocities.reduce((s, v) => s + (v - avgVel) ** 2, 0) / irisVelocities.length)
+  const cv = avgVel > 0 ? velStd / avgVel : 2
+  const smoothnessScore = Math.max(0, Math.min(100, (1 - cv / 2) * 100))
+
+  // 総合: 方向一致60% + 滑らかさ40%
+  const accuracy = directionScore * 0.6 + smoothnessScore * 0.4
   const score = Math.min(100, Math.max(0, Math.round(accuracy)))
 
   return {
     score,
     level: scoreToLevel(score),
-    rawValue: Number((accuracy).toFixed(1)),
+    rawValue: Number(accuracy.toFixed(1)),
     unit: '%',
-    details: `追従成功率${accuracy.toFixed(0)}%（平均ズレ${avgError.toFixed(1)}px）`,
+    details: `追従精度${directionScore.toFixed(0)}%・滑らかさ${smoothnessScore.toFixed(0)}%`,
   }
 }
 
@@ -402,34 +448,36 @@ export function evaluateHeadCompensationItem(frames: EyeFrame[]): CameraEvalItem
   if (frames.length < 10) {
     return { score: 0, level: 'impaired', rawValue: 0, unit: 'px', details: 'フレーム不足' }
   }
-  // 鼻先と顎の座標変動量で頭部の動きを判定
-  const firstNose = frames[0].noseTip
-  let totalMovement = 0
-  let maxMovement = 0
+  const refWidth = frames[0].eyeWidthPx || 200
 
-  for (const f of frames) {
-    const dx = f.noseTip.x - firstNose.x
-    const dy = f.noseTip.y - firstNose.y
+  // フレーム間の鼻先移動量を合計（絶対ドリフトではなく局所的な動き）
+  let totalFrameMovement = 0
+  let maxFrameMovement = 0
+
+  for (let i = 1; i < frames.length; i++) {
+    const dx = frames[i].noseTip.x - frames[i - 1].noseTip.x
+    const dy = frames[i].noseTip.y - frames[i - 1].noseTip.y
     const move = Math.hypot(dx, dy)
-    totalMovement += move
-    if (move > maxMovement) maxMovement = move
+    totalFrameMovement += move
+    if (move > maxFrameMovement) maxFrameMovement = move
   }
 
-  const avgMovement = totalMovement / frames.length
-  // 目幅を基準にして相対値に
-  const refWidth = frames[0].eyeWidthPx || 200
-  const relativeMove = avgMovement / refWidth
+  // 1フレームあたりの平均移動量（眼幅で正規化）
+  const avgFrameMove = totalFrameMovement / (frames.length - 1)
+  const relativeMove = avgFrameMove / refWidth
 
-  // 頭が全く動かない(relativeMove≈0) → 100、大きく動く(>0.15) → 0
-  const score = Math.min(100, Math.max(0, Math.round((1 - relativeMove / 0.15) * 100)))
-  const hasCompensation = relativeMove > 0.05
+  // 頭がほぼ動かない(relativeMove < 0.005) → 100、大きく動く(> 0.05) → 0
+  const score = Math.min(100, Math.max(0, Math.round((1 - relativeMove / 0.05) * 100)))
+  const hasCompensation = relativeMove > 0.015
 
+  const avgMovePx = avgFrameMove
+  const totalMm = (totalFrameMovement * mmPerPx(frames[0])).toFixed(1)
   return {
     score,
     level: scoreToLevel(score),
-    rawValue: Number(avgMovement.toFixed(1)),
+    rawValue: Number(avgMovePx.toFixed(1)),
     unit: 'px',
-    details: `頭部代償${hasCompensation ? 'あり' : 'なし'}（平均移動${avgMovement.toFixed(1)}px・最大${maxMovement.toFixed(1)}px）`,
+    details: `頭部代償${hasCompensation ? 'あり' : 'なし'}（総移動${totalMm}mm）`,
   }
 }
 

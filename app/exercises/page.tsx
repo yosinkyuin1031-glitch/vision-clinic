@@ -38,24 +38,21 @@ export default function ExercisesPage() {
   const filtered = filter === 'all' ? exercises : exercises.filter(e => e.category === filter)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-gray-400 hover:text-gray-600 text-sm">← ダッシュボード</Link>
-            <span className="font-black text-lg text-gray-900">ビジョントレーニング一覧</span>
-          </div>
+    <div className="min-h-screen bg-gray-50 has-bottom-nav">
+      <header className="mobile-header">
+        <div className="mobile-header-inner">
+          <Link href="/" className="text-gray-500 hover:text-gray-900 text-sm font-medium min-h-[44px] flex items-center">← 戻る</Link>
+          <span className="font-bold text-gray-900 text-sm">トレーニング種目</span>
+          <div className="w-10" />
         </div>
       </header>
-      <main className="max-w-3xl mx-auto px-4 py-6">
-        <p className="text-sm text-gray-500 mb-4">各種目のやり方・メトロノームBPM・動画URLを管理できます</p>
-
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button onClick={() => setFilter('all')} className={`text-xs font-bold px-3 py-1.5 rounded-full ${filter === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+      <main className="max-w-lg mx-auto px-4 py-4">
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button onClick={() => setFilter('all')} className={`text-xs font-bold px-3 py-1.5 rounded-full min-h-[32px] ${filter === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
             すべて
           </button>
           {(Object.keys(CATEGORY_LABEL) as ExerciseCategory[]).map(c => (
-            <button key={c} onClick={() => setFilter(c)} className={`text-xs font-bold px-3 py-1.5 rounded-full ${filter === c ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+            <button key={c} onClick={() => setFilter(c)} className={`text-xs font-bold px-3 py-1.5 rounded-full min-h-[32px] ${filter === c ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
               {CATEGORY_LABEL[c]}
             </button>
           ))}
@@ -66,41 +63,58 @@ export default function ExercisesPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map(ex => (
-              <Link key={ex.id} href={`/exercises/${ex.id}`} className="card hover:border-indigo-300 hover:shadow-md transition-all block">
-                <div className="flex items-center gap-4">
+              <Link key={ex.id} href={`/exercises/${ex.id}`} className="card block active:scale-[0.98] transition-transform">
+                <div className="flex items-center gap-3">
                   {ex.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={ex.image_url} alt={ex.name} className="w-16 h-16 object-contain rounded-xl bg-gray-50 flex-shrink-0" />
+                    <img src={ex.image_url} alt={ex.name} className="w-12 h-12 object-contain rounded-xl bg-gray-50 flex-shrink-0" />
                   ) : (
-                    <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center text-gray-300 text-xs flex-shrink-0">👁️</div>
+                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-300 text-xs flex-shrink-0">👁️</div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="font-bold text-base">{ex.name}</h3>
-                      <span className={`badge ${CATEGORY_COLOR[ex.category]}`}>{CATEGORY_LABEL[ex.category]}</span>
-                      <span className={`badge ${ex.difficulty === 'beginner' ? 'badge-green' : ex.difficulty === 'intermediate' ? 'badge-yellow' : 'badge-red'}`}>
-                        {ex.difficulty === 'beginner' ? '初級' : ex.difficulty === 'intermediate' ? '中級' : '上級'}
-                      </span>
+                    <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                      <h3 className="font-bold text-sm">{ex.name}</h3>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${CATEGORY_COLOR[ex.category]}`}>{CATEGORY_LABEL[ex.category]}</span>
                     </div>
                     <p className="text-xs text-gray-500 truncate">{ex.description}</p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-xs text-gray-400">
-                        {ex.duration_sec}秒{ex.default_bpm ? ` / ${ex.default_bpm} BPM` : ''}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-gray-400">
+                        {ex.duration_sec}秒{ex.default_bpm ? ` / ${ex.default_bpm}BPM` : ''}
                       </span>
-                      {ex.video_url ? (
-                        <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">動画あり</span>
-                      ) : (
-                        <span className="text-xs text-gray-300">動画未設定</span>
+                      {ex.video_url && (
+                        <span className="text-[10px] font-bold text-green-600">動画あり</span>
                       )}
                     </div>
                   </div>
-                  <div className="flex-shrink-0 text-sm font-bold text-indigo-600">設定 →</div>
+                  <div className="text-gray-300 text-sm flex-shrink-0">›</div>
                 </div>
               </Link>
             ))}
           </div>
         )}
       </main>
+
+      {/* ボトムナビゲーション */}
+      <nav className="bottom-nav no-print">
+        <div className="bottom-nav-inner">
+          <Link href="/" className="bottom-nav-item">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+            <span className="text-[10px] font-bold">ホーム</span>
+          </Link>
+          <Link href="/analyze" className="bottom-nav-item">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            <span className="text-[10px] font-bold">評価</span>
+          </Link>
+          <Link href="/patients" className="bottom-nav-item">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <span className="text-[10px] font-bold">患者</span>
+          </Link>
+          <Link href="/exercises" className="bottom-nav-item active">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+            <span className="text-[10px] font-bold">種目</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   )
 }

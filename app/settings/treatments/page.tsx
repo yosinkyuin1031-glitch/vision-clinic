@@ -118,15 +118,15 @@ export default function TreatmentRulesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="text-gray-500 hover:text-gray-900 text-sm font-medium">← ダッシュボード</Link>
-          <span className="font-bold text-gray-900">施術提案ルール管理</span>
-          <button onClick={() => setEditing({ ...EMPTY_RULE })} className="text-indigo-600 font-bold text-sm">+ 追加</button>
+      <header className="mobile-header">
+        <div className="mobile-header-inner">
+          <Link href="/" className="text-gray-500 hover:text-gray-900 text-sm font-medium min-h-[44px] flex items-center">← 戻る</Link>
+          <span className="font-bold text-gray-900 text-sm">施術ルール</span>
+          <button onClick={() => setEditing({ ...EMPTY_RULE })} className="text-indigo-600 font-bold text-sm min-h-[44px] flex items-center">+ 追加</button>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-lg mx-auto px-4 py-4">
         {error && (
           <div className="bg-red-50 border border-red-300 text-red-700 rounded-xl p-4 mb-4 text-sm font-medium">
             {error}
@@ -278,10 +278,10 @@ function RuleCard({ rule, onEdit, onDelete, onToggle, editable }: {
         ))}
       </div>
       {editable && (
-        <div className="flex gap-2 text-xs">
-          <button onClick={onEdit} className="text-indigo-600 font-bold">編集</button>
-          <button onClick={onToggle} className="text-gray-500 font-bold">{rule.is_active ? '無効化' : '有効化'}</button>
-          <button onClick={onDelete} className="text-red-500 font-bold">削除</button>
+        <div className="flex gap-3 text-xs pt-1">
+          <button onClick={onEdit} className="text-indigo-600 font-bold min-h-[32px]">編集</button>
+          <button onClick={onToggle} className="text-gray-500 font-bold min-h-[32px]">{rule.is_active ? '無効化' : '有効化'}</button>
+          <button onClick={onDelete} className="text-red-500 font-bold min-h-[32px]">削除</button>
         </div>
       )}
     </div>

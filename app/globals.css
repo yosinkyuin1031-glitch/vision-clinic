@@ -1,33 +1,114 @@
 @import "tailwindcss";
 
-/* iOS Safari: 入力時の自動ズーム防止（font-size < 16px だとズームされる） */
+/* ========================================
+   スマホファースト グローバルスタイル
+   ======================================== */
+
+/* iOS Safari: 入力時の自動ズーム防止 */
 @supports (-webkit-touch-callout: none) {
   input, select, textarea { font-size: 16px !important; }
 }
 
+/* safe-area対応（ノッチ・ホームバー） */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* スクロールバウンスの背景色 */
+html { background: #f9fafb; }
+
+/* タップ時のハイライトを抑制 */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* スムーススクロール */
+html { scroll-behavior: smooth; }
+
+/* ボディにsafe-area余白 */
+body {
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
+
+/* PWA standalone時のステータスバー対策 */
+@media (display-mode: standalone) {
+  body { padding-top: max(var(--sat), 20px); }
+}
+
 @layer components {
-  .card { @apply bg-white border border-gray-200 rounded-2xl p-6 shadow-sm; }
-  .card-blue { @apply bg-blue-50 border border-blue-200 rounded-2xl p-6; }
-  .card-orange { @apply bg-orange-50 border border-orange-200 rounded-2xl p-6; }
-  .card-green { @apply bg-green-50 border border-green-200 rounded-2xl p-6; }
-  .card-red { @apply bg-red-50 border border-red-200 rounded-2xl p-6; }
-  .btn-primary { @apply bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 shadow-sm; }
-  .btn-secondary { @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-3 rounded-xl transition-all border border-gray-200; }
-  .btn-accent { @apply bg-orange-500 hover:bg-orange-400 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 shadow-sm; }
-  .input { @apply bg-white border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 w-full; }
+  .card { @apply bg-white border border-gray-200 rounded-2xl p-5 shadow-sm; }
+  .card-blue { @apply bg-blue-50 border border-blue-200 rounded-2xl p-5; }
+  .card-orange { @apply bg-orange-50 border border-orange-200 rounded-2xl p-5; }
+  .card-green { @apply bg-green-50 border border-green-200 rounded-2xl p-5; }
+  .card-red { @apply bg-red-50 border border-red-200 rounded-2xl p-5; }
+
+  /* ボタン: 最小タッチターゲット 44px */
+  .btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3.5 rounded-xl
+           transition-all active:scale-95 shadow-sm text-center min-h-[44px];
+  }
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-3.5 rounded-xl
+           transition-all border border-gray-200 text-center min-h-[44px];
+  }
+  .btn-accent {
+    @apply bg-orange-500 hover:bg-orange-400 text-white font-bold px-6 py-3.5 rounded-xl
+           transition-all active:scale-95 shadow-sm text-center min-h-[44px];
+  }
+  .input {
+    @apply bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900
+           focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+           placeholder:text-gray-400 w-full min-h-[44px];
+  }
   .label { @apply text-sm font-bold text-gray-700 mb-1.5 block; }
   .badge { @apply text-xs font-bold px-2.5 py-1 rounded-full; }
   .badge-green { @apply text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700; }
   .badge-yellow { @apply text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700; }
   .badge-red { @apply text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700; }
   .badge-blue { @apply text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700; }
+
+  /* モバイルヘッダー */
+  .mobile-header {
+    @apply bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm;
+    padding-top: var(--sat);
+  }
+  .mobile-header-inner {
+    @apply max-w-lg mx-auto px-4 h-14 flex items-center justify-between;
+  }
+
+  /* ボトムナビゲーション */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50;
+    padding-bottom: max(var(--sab), 8px);
+  }
+  .bottom-nav-inner {
+    @apply max-w-lg mx-auto flex items-center justify-around px-2 pt-2;
+  }
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-lg text-gray-400
+           transition-colors min-w-[60px] min-h-[44px] justify-center;
+  }
+  .bottom-nav-item.active {
+    @apply text-indigo-600;
+  }
+
+  /* ボトムナビ分のパディング */
+  .has-bottom-nav {
+    padding-bottom: calc(70px + max(var(--sab), 8px));
+  }
 }
 
-/* 印刷用レイアウト */
+/* ========================================
+   印刷用レイアウト
+   ======================================== */
 .print-only { display: none; }
+.no-print { }
 
 @media print {
-  /* 印刷時は全て非表示にして print-only だけ表示 */
   body * { visibility: hidden; height: 0; overflow: hidden; margin: 0; padding: 0; }
   .print-only, .print-only * {
     visibility: visible !important;
@@ -35,6 +116,7 @@
     overflow: visible !important;
   }
   .print-only { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
+  .no-print { display: none !important; }
   body { background: white !important; font-size: 8pt; color: #111; margin: 0; padding: 0; }
 
   @page { size: A4; margin: 10mm 12mm; }
@@ -47,7 +129,6 @@
   }
   .print-page:last-child { page-break-after: avoid; }
 
-  /* ===== 共通ヘッダー ===== */
   .print-header {
     text-align: center;
     border-bottom: 3px solid #1e40af;
@@ -58,19 +139,13 @@
   .print-header h1 { font-size: 20pt; font-weight: 900; margin: 0; color: #1e40af; letter-spacing: 1px; }
   .print-patient { font-size: 10pt; color: #333; margin-top: 4px; font-weight: 500; }
 
-  /* ===== 1ページ目: 診断レポート ===== */
-
-  /* 総合所見 */
   .print-summary-box {
     background: #eef2ff; border: 1.5px solid #c7d2fe;
     border-radius: 6px; padding: 12px 14px;
     margin-bottom: 14px; flex-shrink: 0;
   }
-  .print-summary-box p {
-    font-size: 11pt; line-height: 1.8; margin: 0; color: #1e3a5f;
-  }
+  .print-summary-box p { font-size: 11pt; line-height: 1.8; margin: 0; color: #1e3a5f; }
 
-  /* 2カラム: 検査結果 + 弱点 */
   .print-report-body {
     display: grid; grid-template-columns: 1fr 1fr;
     gap: 16px; flex: 1;
@@ -81,7 +156,6 @@
     margin: 0 0 8px 0;
   }
 
-  /* 検査テーブル */
   .print-test-table { width: 100%; border-collapse: collapse; }
   .print-test-table td {
     font-size: 10pt; padding: 6px 8px;
@@ -96,14 +170,11 @@
     border-bottom: 2px solid #cbd5e1 !important;
   }
 
-  /* 弱点カード */
   .print-weak-card {
     border: 1.5px solid #e2e8f0; border-radius: 6px;
     padding: 8px 10px; margin-bottom: 8px;
   }
-  .print-weak-top {
-    display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
-  }
+  .print-weak-top { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
   .print-weak-top strong { font-size: 11pt; }
   .print-weak-card p { font-size: 9pt; line-height: 1.5; color: #444; margin: 0; }
   .print-badge-severe {
@@ -122,7 +193,6 @@
     padding: 1px 8px; border-radius: 10px;
   }
 
-  /* 日常生活で気をつけること */
   .print-daily-life {
     flex-shrink: 0; margin-top: 10px;
     border: 1.5px solid #ddd6fe; border-radius: 6px;
@@ -133,40 +203,24 @@
     border-left: 4px solid #7c3aed; padding-left: 8px;
     margin: 0 0 8px 0;
   }
-  .print-daily-life-items {
-    display: flex; flex-direction: column; gap: 4px;
-  }
-  .print-daily-life-item {
-    display: flex; align-items: flex-start; gap: 6px;
-  }
-  .print-daily-life-icon {
-    flex-shrink: 0; font-size: 9pt; line-height: 1.6;
-  }
-  .print-daily-life-item p {
-    font-size: 9.5pt; line-height: 1.6; color: #3b0764; margin: 0;
-  }
+  .print-daily-life-items { display: flex; flex-direction: column; gap: 4px; }
+  .print-daily-life-item { display: flex; align-items: flex-start; gap: 6px; }
+  .print-daily-life-icon { flex-shrink: 0; font-size: 9pt; line-height: 1.6; }
+  .print-daily-life-item p { font-size: 9.5pt; line-height: 1.6; color: #3b0764; margin: 0; }
 
-  /* アドバイスバー */
   .print-advice-bar {
     flex-shrink: 0; margin-top: auto;
     background: #f0fdf4; border: 1.5px solid #bbf7d0;
     border-radius: 6px; padding: 10px 14px;
   }
-  .print-advice-bar p {
-    font-size: 9pt; line-height: 1.6; color: #166534; margin: 2px 0;
-  }
+  .print-advice-bar p { font-size: 9pt; line-height: 1.6; color: #166534; margin: 2px 0; }
   .print-advice-bar p::before { content: "✓ "; font-weight: bold; }
 
-  /* ===== 2ページ目: トレーニング ===== */
-  .print-ex-list {
-    display: flex; flex-direction: column;
-    gap: 10px; flex: 1;
-  }
+  .print-ex-list { display: flex; flex-direction: column; gap: 10px; flex: 1; }
   .print-ex-card {
     display: flex; gap: 14px; align-items: center;
     border: 1.5px solid #d1d5db; border-radius: 8px;
-    padding: 10px 12px;
-    flex: 1;
+    padding: 10px 12px; flex: 1;
   }
   .print-ex-img {
     width: 100px; height: 100px;
@@ -174,10 +228,7 @@
     background: #f0f4ff; flex-shrink: 0;
   }
   .print-ex-info { flex: 1; min-width: 0; }
-  .print-ex-name {
-    display: flex; align-items: center; gap: 8px;
-    margin-bottom: 4px;
-  }
+  .print-ex-name { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
   .print-ex-num {
     width: 24px; height: 24px;
     background: #2563eb; color: white;
@@ -186,23 +237,16 @@
     font-weight: 900; font-size: 11pt; flex-shrink: 0;
   }
   .print-ex-name h3 { font-size: 13pt; font-weight: 800; margin: 0; flex: 1; }
-  .print-ex-reps {
-    font-size: 11pt; color: #ea580c; font-weight: 800;
-    white-space: nowrap;
-  }
+  .print-ex-reps { font-size: 11pt; color: #ea580c; font-weight: 800; white-space: nowrap; }
   .print-ex-why { font-size: 9pt; color: #444; line-height: 1.5; margin: 0 0 2px; }
   .print-ex-muscle { font-size: 8pt; color: #2563eb; font-weight: 600; margin: 0; }
 
-  /* QRコード */
   .print-ex-qr {
     flex-shrink: 0; display: flex; flex-direction: column;
     align-items: center; gap: 2px;
   }
-  .print-ex-qr span {
-    font-size: 7pt; color: #666; font-weight: 600;
-  }
+  .print-ex-qr span { font-size: 7pt; color: #666; font-weight: 600; }
 
-  /* 下部注意書き */
   .print-bottom-note {
     flex-shrink: 0; margin-top: auto;
     text-align: center; padding-top: 8px;

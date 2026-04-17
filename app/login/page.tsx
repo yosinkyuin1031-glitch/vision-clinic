@@ -53,10 +53,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-5">
+      <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-white text-xl mx-auto mb-3">V</div>
+          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-white text-2xl mx-auto mb-3">V</div>
           <h1 className="text-2xl font-black text-gray-900">VisionClinic</h1>
           <p className="text-sm text-gray-500 mt-1">視機能評価・ビジョントレーニング</p>
         </div>

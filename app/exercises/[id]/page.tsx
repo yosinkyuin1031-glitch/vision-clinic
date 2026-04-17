@@ -84,18 +84,16 @@ export default function ExerciseEditPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/exercises" className="text-gray-400 hover:text-gray-600 text-sm">← 一覧に戻る</Link>
-            <span className="font-black text-lg text-gray-900">{ex.name}</span>
-          </div>
-          <button onClick={handleSave} disabled={saving} className="btn-primary text-sm !px-5 !py-2.5">
-            {saving ? '保存中...' : saved ? '保存しました' : '保存する'}
+      <header className="mobile-header">
+        <div className="mobile-header-inner">
+          <Link href="/exercises" className="text-gray-500 hover:text-gray-900 text-sm font-medium min-h-[44px] flex items-center">← 戻る</Link>
+          <span className="font-bold text-gray-900 text-sm truncate max-w-[50%]">{ex.name}</span>
+          <button onClick={handleSave} disabled={saving} className="text-indigo-600 font-bold text-sm min-h-[44px] flex items-center">
+            {saving ? '保存中' : saved ? '完了' : '保存'}
           </button>
         </div>
       </header>
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-lg mx-auto px-4 py-4 space-y-4 pb-8">
 
         {/* プレビュー */}
         <div className="card">
