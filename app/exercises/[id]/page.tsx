@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-browser'
 import type { VisionExercise, ExerciseCategory } from '@/types'
 import { QRCodeSVG } from 'qrcode.react'
 
@@ -11,6 +11,7 @@ const CATEGORIES: { value: ExerciseCategory; label: string }[] = [
   { value: 'convergence', label: '輻輳（寄り目）' },
   { value: 'peripheral', label: '周辺視野' },
   { value: 'eye_stretch', label: 'アイストレッチ' },
+  { value: 'balance', label: 'バランス' },
 ]
 
 export default function ExerciseEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +33,7 @@ export default function ExerciseEditPage({ params }: { params: Promise<{ id: str
   })
 
   useEffect(() => {
+    const supabase = createClient()
     supabase.from('vision_exercises').select('*').eq('id', id).single().then(({ data }) => {
       if (data) {
         const v = data as VisionExercise

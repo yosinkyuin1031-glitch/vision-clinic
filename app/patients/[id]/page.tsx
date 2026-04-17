@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-browser'
 import { QRCodeSVG } from 'qrcode.react'
 import type { Patient, VisionAIAnalysis } from '@/types'
 
@@ -56,6 +56,7 @@ export default function PatientDetailPage() {
 
   useEffect(() => {
     const load = async () => {
+      const supabase = createClient()
       const { data: p } = await supabase
         .from('vc_patients')
         .select('*')

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-browser'
 import type { VisionExercise, ExerciseCategory } from '@/types'
 
 const CATEGORY_LABEL: Record<ExerciseCategory, string> = {
@@ -28,6 +28,7 @@ export default function ExercisesPage() {
   const [filter, setFilter] = useState<ExerciseCategory | 'all'>('all')
 
   useEffect(() => {
+    const supabase = createClient()
     supabase.from('vision_exercises').select('*').order('category').order('difficulty').then(({ data }) => {
       setExercises((data as VisionExercise[]) || [])
       setLoading(false)
