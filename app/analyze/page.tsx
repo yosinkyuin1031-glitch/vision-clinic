@@ -566,6 +566,11 @@ function AnalyzeContent() {
             <Link href="/patients/new" className="btn-secondary flex-1 text-center">+ 新規患者登録</Link>
             <button onClick={() => setStep('checklist')} disabled={!patient} className="btn-primary flex-1 disabled:opacity-40">次へ →</button>
           </div>
+          <button onClick={() => { if (patient) setStep('camera_test') }}
+            disabled={!patient}
+            className="w-full mt-3 text-sm text-gray-400 py-2 hover:text-indigo-500 transition-colors disabled:opacity-30">
+            カメラ評価だけテスト →
+          </button>
         </div>
       )}
 
@@ -660,6 +665,10 @@ function AnalyzeContent() {
               <button onClick={() => setStep('camera_test')} className="btn-primary flex-1">カメラ評価へ →</button>
             )}
           </div>
+          <button onClick={() => setStep('camera_test')}
+            className="w-full mt-3 text-sm text-gray-400 py-2 hover:text-indigo-500 transition-colors">
+            チェックリストをスキップしてカメラ評価へ →
+          </button>
         </div>
       )}
 
