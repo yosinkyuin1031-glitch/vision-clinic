@@ -40,20 +40,11 @@ import {
 // 型・定数
 // ========================================
 
-type Step = 'select_patient' | 'checklist' | 'select_tests' | 'camera_test' | 'analyzing' | 'result'
+type Step = 'select_patient' | 'checklist' | 'camera_test' | 'analyzing' | 'result'
 type CameraPhase = 'ready' | 'fixation' | 'convergence_base' | 'convergence_near' | 'pursuit' | 'saccade' | 'done'
 
-const STEPS: Step[] = ['select_patient', 'checklist', 'select_tests']
-const STEP_LABELS = ['患者選択', 'セルフチェック', '検査選択']
-
-// カメラ検査の項目定義
-type CameraTestKey = 'fixation' | 'convergence' | 'pursuit' | 'saccade'
-const CAMERA_TEST_OPTIONS: { key: CameraTestKey; label: string; desc: string; time: string }[] = [
-  { key: 'fixation', label: '注視テスト', desc: '中央の点を10秒見つめる', time: '約10秒' },
-  { key: 'convergence', label: '輻輳・開散テスト', desc: '近く→遠くの切替を測定', time: '約10秒' },
-  { key: 'pursuit', label: '追従テスト', desc: '動く点を目で追う', time: '約8秒' },
-  { key: 'saccade', label: 'サッカードテスト', desc: '左右の点をすばやく見る', time: '約12秒' },
-]
+const STEPS: Step[] = ['select_patient', 'checklist', 'camera_test']
+const STEP_LABELS = ['患者選択', 'セルフチェック', 'カメラ評価']
 
 const INIT_CHECKLIST: VisionChecklist30 = {
   a: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -125,10 +116,6 @@ function AnalyzeContent() {
   // チェックリスト
   const [checklist, setChecklist] = useState<VisionChecklist30>({ ...INIT_CHECKLIST })
   const [checklistCategory, setChecklistCategory] = useState<'a' | 'b' | 'c'>('a')
-
-  // 検査選択
-  const [selectedTests, setSelectedTests] = useState<Set<CameraTestKey>>(new Set(['fixation', 'convergence', 'pursuit', 'saccade']))
-  const skipCamera = selectedTests.size === 0
 
   // カメラ
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -254,34 +241,6 @@ function AnalyzeContent() {
   // カメラテストフェーズ管理
   // ========================================
 
-  // 選択されたテストの順序に従って次のフェーズを返す
-  const selectedTestsRef = useRef(selectedTests)
-  selectedTestsRef.current = selectedTests
-
-  const getNextPhaseAfter = useCallback((current: CameraTestKey): CameraPhase => {
-    const order: CameraTestKey[] = ['fixation', 'convergence', 'pursuit', 'saccade']
-    const idx = order.indexOf(current)
-    for (let i = idx + 1; i < order.length; i++) {
-      if (selectedTestsRef.current.has(order[i])) {
-        if (order[i] === 'convergence') return 'convergence_base'
-        return order[i] as CameraPhase
-      }
-    }
-    return 'done'
-  }, [])
-
-  // 最初に実施するテストを取得
-  const getFirstPhase = useCallback((): CameraPhase => {
-    const order: CameraTestKey[] = ['fixation', 'convergence', 'pursuit', 'saccade']
-    for (const key of order) {
-      if (selectedTestsRef.current.has(key)) {
-        if (key === 'convergence') return 'convergence_base'
-        return key as CameraPhase
-      }
-    }
-    return 'done'
-  }, [])
-
   // 注視テスト開始（10秒）
   const startFixationTest = useCallback(() => {
     setCameraPhase('fixation')
@@ -294,16 +253,11 @@ function AnalyzeContent() {
       setPhaseTimer(remaining)
       if (remaining <= 0) {
         clearInterval(id)
-        const next = getNextPhaseAfter('fixation')
-        if (next === 'pursuit') { startPursuitTest(); return }
-        if (next === 'saccade') { startSaccadeTest(); return }
-        if (next === 'done') { finishCameraTest(); return }
-        setCameraPhase(next)
+        setCameraPhase('convergence_base')
       }
     }, 200)
     timerRef.current = id
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getNextPhaseAfter])
+  }, [])
 
   // 注視テスト中のフレーム収集
   useEffect(() => {
@@ -320,17 +274,15 @@ function AnalyzeContent() {
     }
   }, [liveFrame])
 
-  // 輻輳テスト: 近点フレーム撮影 → 次のテストへ
+  // 輻輳テスト: 近点フレーム撮影 → 追従テストへ
   const captureNear = useCallback(() => {
     if (liveFrame) {
       setNearFrame(liveFrame)
-      const next = getNextPhaseAfter('convergence')
-      if (next === 'pursuit') { startPursuitTest(); return }
-      if (next === 'saccade') { startSaccadeTest(); return }
-      finishCameraTest()
+      // 追従テストへ
+      startPursuitTest()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveFrame, getNextPhaseAfter])
+  }, [liveFrame])
 
   // 追従テスト（8秒）
   const startPursuitTest = useCallback(() => {
@@ -345,14 +297,11 @@ function AnalyzeContent() {
       setPhaseTimer(remaining)
       if (remaining <= 0) {
         clearInterval(id)
-        const next = getNextPhaseAfter('pursuit')
-        if (next === 'saccade') { startSaccadeTest(); return }
-        finishCameraTest()
+        startSaccadeTest()
       }
     }, 200)
     timerRef.current = id
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getNextPhaseAfter])
+  }, [])
 
   // 追従ターゲット移動（円運動）
   useEffect(() => {
@@ -547,12 +496,11 @@ function AnalyzeContent() {
       const msg = (e instanceof Error ? e.message : '').toLowerCase()
       const isApiKeyError = msg.includes('api-key') || msg.includes('authentication') || msg.includes('401')
       setError(isApiKeyError ? '分析処理に失敗しました。もう一度お試しください。' : (e instanceof Error ? e.message : '分析に失敗しました'))
-      setStep('select_tests')
+      setStep('camera_test')
     }
   }
 
-  // camera_testはselect_testsと同じステップ扱い
-  const currentStepIndex = step === 'camera_test' ? STEPS.indexOf('select_tests') : STEPS.indexOf(step)
+  const currentStepIndex = STEPS.indexOf(step)
 
   // チェックリストスコア計算
   const clScoreA = checklist.a.reduce<number>((s, v) => s + v, 0)
@@ -563,7 +511,7 @@ function AnalyzeContent() {
   return (
     <>
       {/* プログレス */}
-      {!['result', 'analyzing', 'camera_test'].includes(step) && (
+      {!['result', 'analyzing'].includes(step) && (
         <div className="flex items-center gap-1 mb-8">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
@@ -709,84 +657,13 @@ function AnalyzeContent() {
                 {checklistCategory === 'a' ? 'B: 両眼協調へ →' : 'C: 姿勢連動へ →'}
               </button>
             ) : (
-              <button onClick={() => setStep('select_tests')} className="btn-primary flex-1">次へ →</button>
+              <button onClick={() => setStep('camera_test')} className="btn-primary flex-1">カメラ評価へ →</button>
             )}
           </div>
         </div>
       )}
 
-      {/* ======== STEP3: 検査選択 ======== */}
-      {step === 'select_tests' && (
-        <div>
-          <h1 className="text-2xl font-black mb-2">検査項目を選択</h1>
-          <p className="text-gray-500 mb-6">実施するカメラ検査を選んでください。チェックなしでもチェックリストのみでAI分析できます。</p>
-
-          <div className="space-y-3 mb-6">
-            {CAMERA_TEST_OPTIONS.map(opt => {
-              const checked = selectedTests.has(opt.key)
-              return (
-                <button key={opt.key}
-                  onClick={() => setSelectedTests(prev => {
-                    const next = new Set(prev)
-                    if (next.has(opt.key)) next.delete(opt.key)
-                    else next.add(opt.key)
-                    return next
-                  })}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                    checked ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white'
-                  }`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                      checked ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-gray-300'
-                    }`}>
-                      {checked && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900">{opt.label}</p>
-                      <p className="text-sm text-gray-500">{opt.desc}</p>
-                    </div>
-                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">{opt.time}</span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* 全選択/全解除 */}
-          <div className="flex gap-2 mb-6">
-            <button onClick={() => setSelectedTests(new Set(['fixation', 'convergence', 'pursuit', 'saccade']))}
-              className="text-sm text-indigo-600 font-bold px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition-colors">
-              全て選択
-            </button>
-            <button onClick={() => setSelectedTests(new Set())}
-              className="text-sm text-gray-500 font-bold px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
-              全て解除
-            </button>
-          </div>
-
-          {skipCamera && (
-            <div className="card-blue mb-6">
-              <p className="text-sm font-bold text-indigo-800">チェックリストのみで分析</p>
-              <p className="text-xs text-indigo-600 mt-1">30項目チェックリストの回答をもとにAIがビジョンメニューを作成します。カメラ検査は次回以降でも実施できます。</p>
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <button onClick={() => { setStep('checklist'); setChecklistCategory('c') }} className="btn-secondary">← 戻る</button>
-            {skipCamera ? (
-              <button onClick={analyze} className="btn-accent flex-1 text-base py-4">
-                チェックリストのみでAI分析 →
-              </button>
-            ) : (
-              <button onClick={() => setStep('camera_test')} className="btn-primary flex-1">
-                カメラ検査を開始 →（{selectedTests.size}項目）
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ======== STEP4: カメラ検査 ======== */}
+      {/* ======== STEP3: カメラ7項目全自動評価 ======== */}
       {step === 'camera_test' && (
         <div>
           <h1 className="text-2xl font-black mb-2">カメラ評価（7項目自動測定）</h1>
@@ -883,16 +760,16 @@ function AnalyzeContent() {
           {/* フェーズ別コントロール */}
           {cameraPhase === 'ready' && cameraReady && (
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
-              <p className="font-bold text-indigo-800 mb-3">選択された{selectedTests.size}項目のテストを行います</p>
+              <p className="font-bold text-indigo-800 mb-3">これから4つのテストを行います</p>
               <div className="space-y-2.5 mb-3">
-                {([
-                  { key: 'fixation' as CameraTestKey, title: '注視', desc: '中央の赤い点をじっと見つめる', time: '10秒', color: 'bg-red-500' },
-                  { key: 'convergence' as CameraTestKey, title: '輻輳', desc: '画面の点を見て寄り目の測定', time: '自動', color: 'bg-indigo-500' },
-                  { key: 'pursuit' as CameraTestKey, title: '追従', desc: '動く緑の点を目で追いかける', time: '8秒', color: 'bg-green-500' },
-                  { key: 'saccade' as CameraTestKey, title: 'サッカード', desc: '黄色い点が出たらそちらを見る', time: '8回', color: 'bg-yellow-500' },
-                ]).filter(item => selectedTests.has(item.key)).map((item, i) => (
-                  <div key={item.key} className="flex items-center gap-3">
-                    <div className={`w-7 h-7 ${item.color} rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0`}>{i + 1}</div>
+                {[
+                  { step: 1, title: '注視', desc: '中央の赤い点をじっと見つめる', time: '10秒', color: 'bg-red-500' },
+                  { step: 2, title: '輻輳', desc: '画面の点を見て寄り目の測定', time: '自動', color: 'bg-indigo-500' },
+                  { step: 3, title: '追従', desc: '動く緑の点を目で追いかける', time: '8秒', color: 'bg-green-500' },
+                  { step: 4, title: 'サッカード', desc: '黄色い点が出たらそちらを見る', time: '8回', color: 'bg-yellow-500' },
+                ].map(item => (
+                  <div key={item.step} className="flex items-center gap-3">
+                    <div className={`w-7 h-7 ${item.color} rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0`}>{item.step}</div>
                     <div className="flex-1">
                       <p className="text-sm font-bold text-indigo-800">{item.title}<span className="text-xs font-normal text-indigo-600 ml-1">({item.time})</span></p>
                       <p className="text-xs text-indigo-600">{item.desc}</p>
@@ -901,14 +778,7 @@ function AnalyzeContent() {
                 ))}
               </div>
               <p className="text-xs text-indigo-500 mb-3">スマホを顔の正面に置き、頭は動かさず目だけで追ってください。</p>
-              <button onClick={() => {
-                const first = getFirstPhase()
-                if (first === 'fixation') startFixationTest()
-                else if (first === 'convergence_base') setCameraPhase('convergence_base')
-                else if (first === 'pursuit') startPursuitTest()
-                else if (first === 'saccade') startSaccadeTest()
-                else finishCameraTest()
-              }} className="btn-primary w-full">測定を開始する</button>
+              <button onClick={startFixationTest} className="btn-primary w-full">測定を開始する</button>
             </div>
           )}
 
@@ -1006,7 +876,7 @@ function AnalyzeContent() {
           {/* 戻るボタン（テスト中でない場合のみ） */}
           {cameraPhase === 'ready' && (
             <div className="flex gap-3 mt-4">
-              <button onClick={() => setStep('select_tests')} className="btn-secondary flex-1">← 検査選択に戻る</button>
+              <button onClick={() => setStep('checklist')} className="btn-secondary flex-1">← チェックリストに戻る</button>
             </div>
           )}
         </div>
