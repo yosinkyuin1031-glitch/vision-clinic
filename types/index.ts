@@ -2,7 +2,7 @@
 
 export type Gender = 'male' | 'female' | 'other'
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced'
-export type ExerciseCategory = 'pursuit' | 'saccade' | 'convergence' | 'peripheral' | 'eye_stretch' | 'balance'
+export type ExerciseCategory = 'pursuit' | 'saccade' | 'convergence' | 'peripheral' | 'eye_stretch' | 'balance' | 'coordination' | 'warmup'
 
 /** トレーニングモード */
 export type TrainingMode = 'vision' | 'athlete' | 'deskwork'

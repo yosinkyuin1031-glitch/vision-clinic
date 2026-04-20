@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/supabase-server'
 import { createServerClient } from '@/lib/supabase'
 
 const ALLOWED_FIELDS = ['name', 'description', 'instruction', 'category', 'difficulty', 'default_bpm', 'duration_sec', 'image_url', 'video_url']
-const VALID_CATEGORIES = ['pursuit', 'saccade', 'convergence', 'peripheral', 'eye_stretch', 'balance']
+const VALID_CATEGORIES = ['pursuit', 'saccade', 'convergence', 'peripheral', 'eye_stretch', 'balance', 'coordination', 'warmup']
 const VALID_DIFFICULTIES = ['beginner', 'intermediate', 'advanced']
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
